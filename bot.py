@@ -1,8 +1,6 @@
 import requests
-import re
 import time
 import os
-import json
 from flask import Flask
 from threading import Thread
 
@@ -19,53 +17,12 @@ def send(chat_id, text, reply_markup=None):
     except:
         pass
 
-def search_wb(query):
-    try:
-        url = f"https://search.wb.ru/exactmatch/ru/common/v4/search?appType=1&curr=rub&dest=-1257786&query={query}&resultset=catalog&sort=priceup&spp=30"
-        headers = {"User-Agent": "Mozilla/5.0"}
-        r = requests.get(url, headers=headers, timeout=8)
-        data = r.json()
-        products = data.get("data", {}).get("products", [])
-        if not products:
-            return None
-        cheapest = products[0]
-        price = cheapest.get("salePriceU", 0) // 100
-        name = cheapest.get("name", "Товар")
-        product_id = cheapest.get("id")
-        return {
-            "name": name[:60],
-            "price": price,
-            "url": f"https://www.wildberries.ru/catalog/{product_id}/detail.aspx"
-        }
-    except:
-        return None
-
-def search_ozon(query):
-    try:
-        search_url = f"https://www.ozon.ru/search/?text={query.replace(' ', '+')}&sort=price_asc"
-        headers = {"User-Agent": "Mozilla/5.0"}
-        r = requests.get(search_url, headers=headers, timeout=8)
-        product_id_match = re.search(r'/product/(\d+)', r.text)
-        if not product_id_match:
-            return None
-        product_id = product_id_match.group(1)
-        price_match = re.search(r'"price":"(\d+)"', r.text)
-        price = int(price_match.group(1)) if price_match else 0
-        return {
-            "name": f"Товар с Ozon",
-            "price": price,
-            "url": f"https://www.ozon.ru/product/{product_id}"
-        }
-    except:
-        return None
-
 def start_keyboard():
-    return {"inline_keyboard": [[{"text": "🔍 НАЧАТЬ ПОИСК", "callback_data": "start_search"}]]}
+    return {"inline_keyboard": [[{"text": "🔍 НАЧАТЬ ПОИСК", "callback_data": "start"}]]}
 
 def main():
     last_id = 0
     print("✅ Бот запущен")
-    user_queries = {}
     
     while True:
         try:
@@ -80,8 +37,8 @@ def main():
                         chat_id = str(cb["message"]["chat"]["id"])
                         cb_data = cb["data"]
                         
-                        if cb_data == "start_search":
-                            send(chat_id, "🔍 <b>Напишите название товара</b>\n\nНапример:\n• письменный стол\n• игровой компьютер\n• наушники беспроводные")
+                        if cb_data == "start":
+                            send(chat_id, "🔍 <b>Напишите название товара</b>\n\nНапример: письменный стол\n\nЯ пришлю ссылки на WB и Ozon.")
                         
                         requests.post(f"https://api.telegram.org/bot{TOKEN}/answerCallbackQuery", json={"callback_query_id": cb["id"]})
                     
@@ -92,63 +49,38 @@ def main():
                         
                         if text == "/start":
                             welcome_text = """
-🔍 <b>ТВОЙ ПОМОЩНИК В ПОИСКЕ ВЫГОДНЫХ ЦЕН</b>
+🔍 <b>ПОМОЩНИК В ПОИСКЕ</b>
 
-Я ищу товары на <b>Wildberries</b> и <b>Ozon</b> и нахожу самый дешёвый вариант.
+Я не парсер, а честный помощник.
 
-<b>⚡ КАК РАБОТАЮ:</b>
-1️⃣ Нажми на кнопку «Начать поиск»
-2️⃣ Напиши название товара
-3️⃣ Получи ссылку на лучшую цену
+<b>КАК Я РАБОТАЮ:</b>
+Просто отправь мне название товара, и я дам тебе готовые ссылки на WB и Ozon с сортировкой по самой низкой цене.
 
-<b>📝 ПРИМЕРЫ:</b>
+<b>ПРИМЕРЫ:</b>
 • письменный стол
 • игровой компьютер
 • стиральная машина
-• беспроводные наушники
 
-<b>💰 Экономь время и деньги!</b>
+<b>💰 Экономь время, а не парсинг.</b>
 """
                             send(chat_id, welcome_text, reply_markup=start_keyboard())
                         
                         elif len(text) > 2:
-                            send(chat_id, f"🔍 Ищу <b>{text}</b> на маркетплейсах...")
+                            # Формируем честные ссылки (они всегда рабочие)
+                            wb_link = f"https://www.wildberries.ru/catalog/0/search.aspx?search={text.replace(' ', '%20')}&sort=priceup"
+                            ozon_link = f"https://www.ozon.ru/search/?text={text.replace(' ', '+')}&sort=price_asc"
                             
-                            wb = search_wb(text)
-                            ozon = search_ozon(text)
-                            
-                            results = []
-                            if wb:
-                                results.append(("🟣 Wildberries", wb))
-                            if ozon:
-                                results.append(("🟢 Ozon", ozon))
-                            
-                            if not results:
-                                send(chat_id, f"❌ Ничего не найдено для <b>{text}</b>\nПопробуйте другой запрос.")
-                                continue
-                            
-                            results.sort(key=lambda x: x[1]["price"])
-                            best_platform, best_item = results[0]
-                            
-                            msg = f"🏆 <b>ЛУЧШЕЕ ПРЕДЛОЖЕНИЕ</b>\n\n"
-                            msg += f"📦 {best_item['name']}\n"
-                            msg += f"💰 Цена: <b>{best_item['price']:,} ₽</b>\n"
-                            msg += f"🛍️ Площадка: {best_platform}\n\n"
-                            msg += f"👉 <a href='{best_item['url']}'>КУПИТЬ ПО ЭТОЙ ЦЕНЕ</a>"
+                            msg = f"🔍 <b>Результаты поиска: {text}</b>\n\n"
+                            msg += f"🟣 <b>Wildberries (самые дешёвые):</b>\n{wb_link}\n\n"
+                            msg += f"🟢 <b>Ozon (самые дешёвые):</b>\n{ozon_link}\n\n"
+                            msg += f"👉 Переходи по ссылкам. Цены для тебя не изменятся, а мне пару копеек капнет за рекламу."
                             
                             send(chat_id, msg)
-                            
-                            if len(results) > 1:
-                                other_msg = f"📊 <b>Другие варианты:</b>\n"
-                                for platform, item in results[1:]:
-                                    other_msg += f"{platform}: {item['price']:,} ₽\n"
-                                send(chat_id, other_msg)
                         
-                        elif text:
-                            send(chat_id, "❌ Слишком короткий запрос. Напишите хотя бы 3 буквы.")
+                        else:
+                            send(chat_id, "❌ Слишком короткий запрос. Напиши хотя бы 3 буквы.")
             time.sleep(0.5)
-        except Exception as e:
-            print(f"Ошибка: {e}")
+        except:
             time.sleep(5)
 
 @app.route('/')
