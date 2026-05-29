@@ -38,7 +38,7 @@ def main():
                         cb_data = cb["data"]
                         
                         if cb_data == "start":
-                            send(chat_id, "🔍 <b>Напишите название товара</b>\n\nНапример: письменный стол\n\nЯ пришлю ссылки на WB и Ozon.")
+                            send(chat_id, "🔍 <b>Напишите название товара</b>\n\nНапример: письменный стол")
                         
                         requests.post(f"https://api.telegram.org/bot{TOKEN}/answerCallbackQuery", json={"callback_query_id": cb["id"]})
                     
@@ -49,31 +49,29 @@ def main():
                         
                         if text == "/start":
                             welcome_text = """
-🔍 <b>ПОМОЩНИК В ПОИСКЕ</b>
+🔍 <b>ТВОЙ ПОМОЩНИК В ПОИСКЕ</b>
 
-Я не парсер, а честный помощник.
-
-<b>КАК Я РАБОТАЮ:</b>
-Просто отправь мне название товара, и я дам тебе готовые ссылки на WB и Ozon с сортировкой по самой низкой цене.
+<b>КАК РАБОТАЮ:</b>
+Напиши название товара, и я дам ссылки на WB и Ozon с сортировкой от дешёвых к дорогим.
 
 <b>ПРИМЕРЫ:</b>
 • письменный стол
 • игровой компьютер
+• наушники
 • стиральная машина
 
-<b>💰 Экономь время, а не парсинг.</b>
+<b>💰 Экономь время — не листай сотни страниц.</b>
 """
                             send(chat_id, welcome_text, reply_markup=start_keyboard())
                         
                         elif len(text) > 2:
-                            # Формируем честные ссылки (они всегда рабочие)
                             wb_link = f"https://www.wildberries.ru/catalog/0/search.aspx?search={text.replace(' ', '%20')}&sort=priceup"
                             ozon_link = f"https://www.ozon.ru/search/?text={text.replace(' ', '+')}&sort=price_asc"
                             
-                            msg = f"🔍 <b>Результаты поиска: {text}</b>\n\n"
-                            msg += f"🟣 <b>Wildberries (самые дешёвые):</b>\n{wb_link}\n\n"
-                            msg += f"🟢 <b>Ozon (самые дешёвые):</b>\n{ozon_link}\n\n"
-                            msg += f"👉 Переходи по ссылкам. Цены для тебя не изменятся, а мне пару копеек капнет за рекламу."
+                            msg = f"🔍 <b>{text}</b>\n\n"
+                            msg += f"🟣 <b>Wildberries (сначала дешёвые):</b>\n{wb_link}\n\n"
+                            msg += f"🟢 <b>Ozon (сначала дешёвые):</b>\n{ozon_link}\n\n"
+                            msg += f"👉 Переходи по ссылкам и выбирай."
                             
                             send(chat_id, msg)
                         
